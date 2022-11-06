@@ -1,0 +1,25 @@
+
+name: Notify Slack of Failure
+description: Notify a Slack channel of the workflow failure.
+
+inputs:
+  channel_id:
+    description: The ID of the Slack channel to post the message.
+    required: false
+    default: 'github-actions'
+  slack_bot_token:
+    description: The token for the Slack Bot application.
+    required: true
+
+runs:
+  using: composite
+
+  steps:
+    - name: Post message
+      env:
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+      uses: voxmedia/github-action-slack-notify-build@v1
+      with:
+        channel: ${{ inputs.channel_id }}
+        status: FAILED
+        color: danger

@@ -1,0 +1,70 @@
+
+name: Set Up GCloud and Helm
+description: Authenticates with the Google Kubernetes Engine (GKE) and sets up Helm.
+
+inputs:
+  cluster_name:
+    description: Name of the cluster for which to get credentials.
+    required: true
+  helm_plugin_diff_version:
+    description: The version of the Helm Diff plugin to use, e.g. 3.6.0.
+    required: false
+    default: 3.6.0
+  helm_plugin_secrets_version:
+    description: The version of the Helm Secrets plugin to use, e.g. 4.1.1.
+    required: false
+    default: 4.1.1
+  helm_version:
+    description: The version of Helm to use, e.g. 3.10.0.
+    required: false
+    default: 3.10.0
+  location:
+    description: Location (e.g. region or zone) in which the cluster resides.
+    required: true
+  service_account:
+    description: Email address or unique identifier of the Google Cloud service account for which to generate credentials.
+    required: true
+  vals_version:
+    description: The version of vals to use when encrypting/decrypting, e.g 0.18.0.
+    required: false
+    default: 0.18.0
+  workload_identity_provider:
+    description: The full identifier of the Workload Identity Provider, including the project number, pool name, and provider name.
+    required: true
+
+runs:
+  using: composite
+
+  steps:
+    - id: auth
+      name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v0
+      with:
+        workload_identity_provider: ${{ inputs.workload_identity_provider }}
+        service_account: ${{ inputs.service_account }}
+
+    - id: get-credentials
+      name: Get GKE credentials
+      uses: google-github-actions/get-gke-credentials@v0
+      with:
+        cluster_name: ${{ inputs.cluster_name }}
+        location: ${{ inputs.location }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v0
+
+    - name: Install Helm
+      uses: azure/setup-helm@v2.1
+      with:
+        version: ${{ inputs.helm_version }}
+
+    - name: Install Helm plugins
+      run: |-
+        helm plugin install https://github.com/databus23/helm-diff --version ${{ inputs.helm_plugin_diff_version }}
+        helm plugin install https://github.com/jkroepke/helm-secrets --version ${{ inputs.helm_plugin_secrets_version }}
+      shell: sh
+
+    - name: Install vals
+      uses: jkroepke/setup-vals@v1
+      with:
+        version: ${{ inputs.vals_version }}
