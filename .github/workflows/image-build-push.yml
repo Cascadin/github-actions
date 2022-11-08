@@ -18,6 +18,9 @@ on:
         type: string
 
     secrets:
+      gc_compute_region:
+        description: The Google Cloud Compute Region where the assets reside.
+        required: true
       gc_compute_zone:
         description: The Google Cloud Compute Zone where the assets reside.
         required: true
@@ -85,4 +88,4 @@ jobs:
           file: ./Dockerfile
           target: release-stage
           push: true
-          tags: "${{ secrets.gc_compute_zone }}-docker.pkg.dev/${{ secrets.gc_project_id }}/${{ inputs.cr_repository }}/${{ inputs.cr_repository }}:${{ env.RELEASE_VERSION }}"
+          tags: "${{ secrets.gc_compute_region }}-docker.pkg.dev/${{ secrets.gc_project_id }}/${{ inputs.cr_repository }}/${{ inputs.cr_repository }}:${{ env.RELEASE_VERSION }}"
