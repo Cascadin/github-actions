@@ -1,0 +1,83 @@
+name: "Helm Upgrade"
+
+on:
+  workflow_call:
+    inputs:
+      helm_release_namespace:
+        description: Kubernetes namespace corresponding to a Helm release, e.g. 'development'.
+        required: true
+        type: string
+      helm_release_prefix:
+        description: The prefix used for the Helm release, e.g. 'cascadin-wiki', 'cascadin-app'.
+        required: true
+        type: string
+      helm_working_directory:
+        description: The relative directory where Helm commands will execute.
+        required: false
+        default: "./chart"
+        type: string
+
+    secrets:
+      gc_compute_zone:
+        description: The Google Cloud Compute Zone where the assets reside.
+        required: true
+      gc_gke_cluster:
+        description: The cluster name on the Google Kubernetes Engine (GKE).
+        required: true
+      gc_service_account:
+        description: The Google Cloud Service Account tied to the WIP.
+        required: true
+      gc_workload_identity_provider:
+        description: The Google Cloud Workload Identity Provider (WIP).
+        required: true
+
+env:
+  HELM_SECRETS_BACKEND: vals
+
+jobs:
+  upgrade:
+    name: Run Helm Upgrade on GKE
+    runs-on: ubuntu-20.04
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download Shared Workflow Properties
+        uses: actions/download-artifact@v3
+        with:
+          name: shared-workflow-props
+
+      - name: Apply Shared Workflow Properties
+        working-directory: .
+        run: |-
+          source workflow.properties
+          echo "GIT_REF=${gitRef}" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=${releaseVersion}" >> $GITHUB_ENV
+          echo "HELM_RELEASE_NAMESPACE_SHORTHAND=${helmReleaseNamespaceShorthand}" >> $GITHUB_ENV
+
+      - name: Check out repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+          path: .
+          ref: ${{ env.GIT_REF }}
+
+      - name: Set Up Tools
+        uses: cascadin/github-actions/.github/actions/gcloud-helm-setup@main
+        with:
+          cluster_name: ${{ secrets.gc_gke_cluster }}
+          location: ${{ secrets.gc_compute_zone }}
+          service_account: ${{ secrets.gc_service_account }}
+          workload_identity_provider: ${{ secrets.gc_workload_identity_provider }}
+
+      - name: Deploy the Helm chart
+        working-directory: ${{ inputs.helm_working_directory }}
+        run: |-
+          helm secrets upgrade ${{ inputs.helm_release_prefix }}-${{ env.HELM_RELEASE_NAMESPACE_SHORTHAND }} . \
+          -f ./vars/${{ env.HELM_RELEASE_NAMESPACE_SHORTHAND }}/secrets.yml \
+          -f ./vars/${{ env.HELM_RELEASE_NAMESPACE_SHORTHAND }}/values.yml \
+          -f ./vars/secrets.yml \
+          -f ./vars/values.yml \
+          -n ${{ inputs.helm_release_namespace }}
