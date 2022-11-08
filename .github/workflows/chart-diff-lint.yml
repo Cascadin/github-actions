@@ -1,0 +1,84 @@
+name: "Helm Chart: Diff/lint"
+
+on:
+  workflow_call:
+    inputs:
+      helm_release_prefix:
+        description: The prefix used for the Helm release, e.g. 'slate-portal', 'slate-api'.
+        required: true
+        type: string
+      helm_working_directory:
+        description: The relative directory where Helm commands will execute.
+        required: false
+        default: "./chart"
+        type: string
+
+    secrets:
+      gc_compute_zone:
+        description: The Google Cloud Compute Zone where the assets reside.
+        required: true
+      gc_gke_cluster:
+        description: The cluster name on the Google Kubernetes Engine (GKE).
+        required: true
+      gc_service_account:
+        description: The Google Cloud Service Account tied to the WIP.
+        required: true
+      gc_workload_identity_provider:
+        description: The Google Cloud Workload Identity Provider (WIP).
+        required: true
+
+env:
+  HELM_SECRETS_BACKEND: vals
+
+jobs:
+  diff-lint:
+    name: Helm Diff/Lint
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: development
+            shorthand: dev
+          - name: staging
+            shorthand: staging
+          - name: production
+            shorthand: prod
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+          path: .
+
+      - name: Set Up Tools
+        uses: cascadin/github-actions/.github/actions/gcloud-helm-setup@v0.1.0
+        with:
+          cluster_name: ${{ secrets.gc_gke_cluster }}
+          location: ${{ secrets.gc_compute_zone }}
+          service_account: ${{ secrets.gc_service_account }}
+          workload_identity_provider: ${{ secrets.gc_workload_identity_provider }}
+
+      - name: Chart Diff
+        working-directory: ${{ inputs.helm_working_directory }}
+        run: |-
+          helm secrets diff upgrade ${{ inputs.helm_release_prefix }}-${{ matrix.shorthand }} . \
+          -f ./vars/${{ matrix.shorthand }}/secrets.yml \
+          -f ./vars/${{ matrix.shorthand }}/values.yml \
+          -f ./vars/secrets.yml \
+          -f ./vars/values.yml \
+          -n ${{ matrix.name }}
+
+      - name: Lint the DEV chart
+        working-directory: ${{ inputs.helm_working_directory }}
+        run: |-
+          helm secrets lint . \
+          -f ./vars/${{ matrix.shorthand }}/secrets.yml \
+          -f ./vars/${{ matrix.shorthand }}/values.yml \
+          -f ./vars/secrets.yml \
+          -f ./vars/values.yml
