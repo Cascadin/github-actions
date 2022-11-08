@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       helm_release_prefix:
-        description: The prefix used for the Helm release, e.g. 'slate-portal', 'slate-api'.
+        description: The prefix used for the Helm release, e.g. 'cascadin-wiki', 'cascadin-app'.
         required: true
         type: string
       helm_working_directory:
