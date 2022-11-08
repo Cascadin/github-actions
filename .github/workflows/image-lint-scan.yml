@@ -77,7 +77,7 @@ jobs:
           exit-code: 1
           failure-threshold: FATAL
           timeout: "10m"
-          continue-on-error: ${{ inputs.continue_on_lint_error }}
+        continue-on-error: ${{ inputs.continue_on_lint_error }}
 
   scan:
     name: Trivy Scan
