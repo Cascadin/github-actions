@@ -1,8 +1,12 @@
-name: "Helm Chart: Diff/lint"
+name: "Helm Upgrade"
 
 on:
   workflow_call:
     inputs:
+      helm_release_namespace:
+        description: Kubernetes namespace corresponding to a Helm release, e.g. 'development'.
+        required: true
+        type: string
       helm_release_prefix:
         description: The prefix used for the Helm release, e.g. 'cascadin-wiki', 'cascadin-app'.
         required: true
@@ -31,30 +35,34 @@ env:
   HELM_SECRETS_BACKEND: vals
 
 jobs:
-  diff-lint:
-    name: Helm Diff/Lint
+  upgrade:
+    name: Run Helm Upgrade on GKE
     runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: development
-            shorthand: dev
-          - name: staging
-            shorthand: staging
-          - name: production
-            shorthand: prod
 
     permissions:
       contents: read
       id-token: write
 
     steps:
+      - name: Download Shared Workflow Properties
+        uses: actions/download-artifact@v3
+        with:
+          name: shared-workflow-props
+
+      - name: Apply Shared Workflow Properties
+        working-directory: .
+        run: |-
+          source workflow.properties
+          echo "GIT_REF=${gitRef}" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=${releaseVersion}" >> $GITHUB_ENV
+          echo "HELM_RELEASE_NAMESPACE_SHORTHAND=${helmReleaseNamespaceShorthand}" >> $GITHUB_ENV
+
       - name: Check out repo
         uses: actions/checkout@v3
         with:
           fetch-depth: 1
           path: .
+          ref: ${{ env.GIT_REF }}
 
       - name: Set Up Tools
         uses: cascadin/github-actions/.github/actions/gcloud-helm-setup@main
@@ -64,24 +72,12 @@ jobs:
           service_account: ${{ secrets.gc_service_account }}
           workload_identity_provider: ${{ secrets.gc_workload_identity_provider }}
 
-      - name: Chart Diff
+      - name: Deploy the Helm chart
         working-directory: ${{ inputs.helm_working_directory }}
         run: |-
-          helm secrets diff upgrade ${{ inputs.helm_release_prefix }}-${{ matrix.shorthand }} . \
-          -f ./vars/${{ matrix.shorthand }}/secrets.yml \
-          -f ./vars/${{ matrix.shorthand }}/values.yml \
+          helm secrets upgrade ${{ inputs.helm_release_prefix }}-${{ env.HELM_RELEASE_NAMESPACE_SHORTHAND }} . \
+          -f ./vars/${{ env.HELM_RELEASE_NAMESPACE_SHORTHAND }}/secrets.yml \
+          -f ./vars/${{ env.HELM_RELEASE_NAMESPACE_SHORTHAND }}/values.yml \
           -f ./vars/secrets.yml \
           -f ./vars/values.yml \
-          -n ${{ matrix.name }} \
-          --allow-unreleased
-        env:
-          HELM_DIFF_COLOR: true
-
-      - name: Lint the DEV chart
-        working-directory: ${{ inputs.helm_working_directory }}
-        run: |-
-          helm secrets lint . \
-          -f ./vars/${{ matrix.shorthand }}/secrets.yml \
-          -f ./vars/${{ matrix.shorthand }}/values.yml \
-          -f ./vars/secrets.yml \
-          -f ./vars/values.yml
+          -n ${{ inputs.helm_release_namespace }}

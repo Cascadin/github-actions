@@ -1,0 +1,121 @@
+name: Chart Release Checks
+
+on:
+  workflow_call:
+    inputs:
+      helm_release_namespace:
+        description: Kubernetes namespace corresponding to a Helm release, e.g. 'development'.
+        required: true
+        type: string
+      helm_release_prefix:
+        description: The prefix used for the Helm release, e.g. 'cascadin-wiki', 'cascadin-app'.
+        required: true
+        type: string
+      python_packages:
+        description: The pip packages to use.
+        required: false
+        default: |
+          pyyaml==6.0
+          semver==2.13.0
+        type: string
+      python_version:
+        description: The version of Python to use, e.g. 3.9.
+        required: false
+        default: 3.9
+        type: string
+      prod_release_expected:
+        description: The expected production release semantic version, e.g. '1.0.0'.
+        required: false
+        type: string
+
+    secrets:
+      gc_compute_zone:
+        description: The Google Cloud Compute Zone where the assets reside.
+        required: true
+      gc_gke_cluster:
+        description: The cluster name on the Google Kubernetes Engine (GKE).
+        required: true
+      gc_service_account:
+        description: The Google Cloud Service Account tied to the WIP.
+        required: true
+      gc_workload_identity_provider:
+        description: The Google Cloud Workload Identity Provider (WIP).
+        required: true
+
+env:
+  HELM_SECRETS_BACKEND: vals
+  GITHUB_ACTIONS_BRANCHORTAG: main
+  GITHUB_ACTIONS_RAWCONTENT_URL: https://raw.githubusercontent.com/cascadin/github-actions
+
+jobs:
+  semver:
+    name: Semver Checks
+    runs-on: ubuntu-20.04
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download Shared Workflow Properties
+        uses: actions/download-artifact@v3
+        with:
+          name: shared-workflow-props
+
+      - name: Apply Shared Workflow Properties
+        working-directory: .
+        run: |-
+          source workflow.properties
+          echo "GIT_REF=${gitRef}" >> $GITHUB_ENV
+          echo "HELM_RELEASE_NAMESPACE_SHORTHAND=${helmReleaseNamespaceShorthand}" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=${releaseVersion}" >> $GITHUB_ENV
+
+      - name: Set Up Tools
+        uses: cascadin/github-actions/.github/actions/gcloud-helm-setup@main
+        with:
+          cluster_name: ${{ secrets.gc_gke_cluster }}
+          location: ${{ secrets.gc_compute_zone }}
+          service_account: ${{ secrets.gc_service_account }}
+          workload_identity_provider: ${{ secrets.gc_workload_identity_provider }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Install Python packages
+        uses: BSFishy/pip-action@v1
+        with:
+          packages: ${{ inputs.python_packages }}
+
+      - name: Compare Expected Release Versions (Prod)
+        if: ${{ inputs.helm_release_namespace == 'production' }}
+        uses: jannekem/run-python-script-action@v1
+        with:
+          script: |
+            import os
+            import semver
+            
+            if semver.compare("${{ inputs.prod_release_expected }}", os.environ.get('RELEASE_VERSION')) != 0:
+              message = "The source appVersion in Chart.yaml does not match chosen release version."
+              error(message)
+              raise Exception(message)
+
+      - id: compare-versions
+        name: Compare Deployed & Source Release Versions (Dev/Staging)
+        if: ${{ inputs.helm_release_namespace != 'production' }}
+        env:
+          HELM_RELEASE_NAMESPACE: ${{ inputs.helm_release_namespace }}
+          HELM_RELEASE_PREFIX: ${{ inputs.helm_release_prefix }}
+        run: |-
+          curl -fsSL ${{ env.GITHUB_ACTIONS_RAWCONTENT_URL }}/${{ env.GITHUB_ACTIONS_BRANCHORTAG }}/scripts/semver-compare.py -o semver-compare.py
+          python semver-compare.py
+
+      - name: "Release Version: Not Ahead (Dev/Staging)"
+        if:  ${{ inputs.helm_release_namespace != 'production' && steps.compare-versions.outputs.ahead == 'false' }}
+        uses: jannekem/run-python-script-action@v1
+        with:
+          script: |
+            message = "The source appVersion in Chart.yaml is not ahead of the deployed appVersion. Update the source and try again."
+            error(message)
+            raise Exception(message)
