@@ -81,9 +81,6 @@ jobs:
       - name: Configure Git
         uses: cascadin/github-actions/.github/actions/configure-git@main
 
-      - name: Debugging
-        run: docker pull ${{ secrets.gc_compute_region }}-docker.pkg.dev/${{ secrets.gc_project_id }}/${{ inputs.cr_repository }}/${{ inputs.cr_repository }}:0.0.1
-
       - name: Build the image
         run: |-
           docker build . \
