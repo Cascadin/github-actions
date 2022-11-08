@@ -74,6 +74,7 @@ jobs:
           -f ./vars/values.yml \
           -n ${{ matrix.name }} \
           --allow-unreleased
+        shell: bash
 
       - name: Lint the DEV chart
         working-directory: ${{ inputs.helm_working_directory }}
@@ -83,3 +84,4 @@ jobs:
           -f ./vars/${{ matrix.shorthand }}/values.yml \
           -f ./vars/secrets.yml \
           -f ./vars/values.yml
+        shell: bash
