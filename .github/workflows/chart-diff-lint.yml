@@ -57,7 +57,7 @@ jobs:
           path: .
 
       - name: Set Up Tools
-        uses: cascadin/github-actions/.github/actions/gcloud-helm-setup@v0.1.0
+        uses: cascadin/github-actions/.github/actions/gcloud-helm-setup@main
         with:
           cluster_name: ${{ secrets.gc_gke_cluster }}
           location: ${{ secrets.gc_compute_zone }}
