@@ -83,7 +83,7 @@ jobs:
 
       - name: Build the image
         run: |-
-          docker build \
+          docker build . \
             --file ./Dockerfile \
             --target release-stage \
             --tag "${{ secrets.gc_compute_region }}-docker.pkg.dev/${{ secrets.gc_project_id }}/${{ inputs.cr_repository }}/${{ inputs.cr_repository }}:${{ env.RELEASE_VERSION }}"
