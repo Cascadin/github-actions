@@ -27,9 +27,6 @@ on:
       gc_gke_cluster:
         description: The cluster name on the Google Kubernetes Engine (GKE).
         required: true
-      gc_project_id:
-        description: The Google Cloud Project ID.
-        required: true
       gc_service_account:
         description: The Google Cloud Service Account tied to the WIP.
         required: true
@@ -86,11 +83,11 @@ jobs:
           docker build . \
             --file ./Dockerfile \
             --target release-stage \
-            --tag "${{ secrets.gc_compute_region }}-docker.pkg.dev/${{ secrets.gc_project_id }}/${{ inputs.cr_repository }}/${{ inputs.cr_repository }}:${{ env.RELEASE_VERSION }}"
+            --tag "${{ secrets.gc_compute_region }}-docker.pkg.dev/${{ env.GCLOUD_PROJECT }}/${{ inputs.cr_repository }}/${{ inputs.cr_repository }}:${{ env.RELEASE_VERSION }}"
 
       - name: Push the image
         run: |-
-          docker push "${{ secrets.gc_compute_region }}-docker.pkg.dev/${{ secrets.gc_project_id }}/${{ inputs.cr_repository }}/${{ inputs.cr_repository }}:${{ env.RELEASE_VERSION }}"
+          docker push "${{ secrets.gc_compute_region }}-docker.pkg.dev/${{ env.GCLOUD_PROJECT }}/${{ inputs.cr_repository }}/${{ inputs.cr_repository }}:${{ env.RELEASE_VERSION }}"
 
 #      - name: Build/push image to CR
 #        uses: docker/build-push-action@v3
