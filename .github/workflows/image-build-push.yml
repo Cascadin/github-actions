@@ -7,6 +7,10 @@ on:
         description: Repository where the built image shall be pushed, e.g. 'cascadin-wiki', 'cascadin-app'.
         required: true
         type: string
+      gc_compute_region:
+        description: The Google Cloud Compute Region where the assets reside.
+        required: true
+        type: string
       helm_release_namespace:
         description: Kubernetes namespace corresponding to a Helm release, e.g. 'development'.
         required: true
@@ -18,9 +22,6 @@ on:
         type: string
 
     secrets:
-      gc_compute_region:
-        description: The Google Cloud Compute Region where the assets reside.
-        required: true
       gc_compute_zone:
         description: The Google Cloud Compute Zone where the assets reside.
         required: true
