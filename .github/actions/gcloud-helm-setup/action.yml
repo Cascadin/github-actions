@@ -55,11 +55,8 @@ runs:
       uses: google-github-actions/setup-gcloud@v0
 
     - name: Authenticate to Google Artifact Registry
-      uses: docker/login-action@v2
-      with:
-        username: "oauth2accesstoken"
-        password: "${{ steps.auth.outputs.access_token }}"
-        registry: "${{ inputs.location }}-docker.pkg.dev"
+      run: gcloud auth configure-docker us-central1-docker.pkg.dev
+      shell: sh
 
     - name: Install Helm
       uses: azure/setup-helm@v2.1
